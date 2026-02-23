@@ -198,6 +198,121 @@ body {
 }
 
 /* Update Pulse Animation */
+@keyframes pulse-animation {
+  0% {
+    transform: scale(1);
+  }
+
+  50% {
+    transform: scale(1.1);
+    color: #ffcc00;
+  }
+
+  100% {
+    transform: scale(1);
+  }
+}
+
+.leaderboard-card {
+  background: linear-gradient(145deg, rgba(20, 20, 20, 0.9), rgba(5, 5, 5, 0.95));
+  padding: 8px 15px;
+  border-radius: 12px;
+  border: 2px solid #ffcc00;
+  box-shadow: 0 0 20px rgba(255, 204, 0, 0.2), inset 0 0 10px rgba(255, 204, 0, 0.1);
+  text-align: center;
+  position: absolute;
+  top: 15px;
+  left: 15px;
+  overflow: hidden;
+  animation: float 4s ease-in-out infinite;
+  z-index: 100;
+  max-width: 180px;
+}
+
+.leaderboard-card::before {
+  content: '';
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  background: radial-gradient(circle, rgba(255, 204, 0, 0.1) 0%, transparent 60%);
+  animation: rotate 10s linear infinite;
+  pointer-events: none;
+}
+
+@keyframes rotate {
+  from {
+    transform: rotate(0deg);
+  }
+
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes float {
+
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+
+  50% {
+    transform: translateY(-3px);
+  }
+}
+
+.leaderboard-badge {
+  font-size: 0.70rem;
+  color: #ffcc00;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  font-weight: 800;
+  margin-bottom: 2px;
+  text-shadow: 0 0 5px rgba(255, 204, 0, 0.5);
+}
+
+.leaderboard-name {
+  font-size: 1.1rem;
+  color: #fff;
+  font-family: 'Creepster', cursive;
+  margin: 2px 0;
+  letter-spacing: 1px;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.8), 0 0 10px rgba(255, 204, 0, 0.4);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.leaderboard-score-container {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 4px;
+  margin-top: 2px;
+}
+
+.score-label {
+  font-size: 0.65rem;
+  color: #888;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.score-value {
+  font-size: 1.1rem;
+  color: #00ffcc;
+  font-weight: 900;
+  text-shadow: 0 0 8px rgba(0, 255, 204, 0.5);
+}
+
+.score-unit {
+  font-size: 0.8rem;
+  color: #00ffcc;
+  font-weight: bold;
+}
+
 @keyframes hudPulse {
   0% {
     transform: scale(1);

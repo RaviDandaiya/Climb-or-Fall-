@@ -7,9 +7,9 @@
     <title>Climb-or-Fall | Ultimate Rage Platformer</title>
     <link rel="icon" type="image/svg+xml" href="./logo.svg">
 
-    <meta name="google-adsense-account" content="ca-pub-5820888942116492">
-    <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-5820888942116492"
-        crossorigin="anonymous"></script>
+    <!-- CrazyGames SDK v3 -->
+    <script src="https://sdk.crazygames.com/crazygames-sdk-v3.js"></script>
+
     <!-- SEO Meta Tags -->
     <meta name="description"
         content="Climb-or-Fall: A high-intensity 2D physics rage platformer. Scale the infinite tower, unlock skins, and complete the battle pass. Can you reach the top?">
@@ -74,6 +74,10 @@
         <div id="ui-overlay" class="hidden">
             <div id="game-logo-container">
                 <h1 class="logo-text">CLIMB<br><span>OR FALL</span></h1>
+                <div style="font-size: 0.8rem; color: #888; margin-top: 8px; font-weight: bold; letter-spacing: 1px;">
+                    <span style="color: #555;">ID:</span> <span id="hud-player-name"
+                        style="color: #00ffcc;">Loading...</span>
+                </div>
             </div>
             <div class="hud-stats">
                 <div class="stat-card">
@@ -99,32 +103,30 @@
             <button class="nav-icon" id="btn-pass">⚔️</button>
         </div>
 
-        <!-- Login Screen -->
-        <div id="login-screen" class="screen-overlay hidden">
-            <div class="menu-logo-container">
-                <img src="./logo.svg" class="game-logo-img" alt="Climb-or-Fall Rage Platformer Game Logo">
-                <h1 class="logo-text">CLIMB<br><span>OR FALL</span></h1>
-            </div>
-            <h1 class="horror-title" style="font-size: 2rem;">AUTHENTICATE</h1>
-            <div class="menu-buttons" style="flex-direction: column;">
-                <button id="btn-google-login" class="menu-btn play-games">
-                    GOOGLE PLAY LOGIN
-                    <span class="btn-desc">Save Progress</span>
-                </button>
-                <button id="btn-guest-login" class="menu-btn guest-mode">
-                    GUEST MODE
-                    <span class="btn-desc">Local Saves</span>
-                </button>
-            </div>
-        </div>
+        <!-- Login Screen REMOVED: Replaced by Auto-Auth -->
 
         <!-- Start Menu -->
         <div id="difficulty-screen" class="screen-overlay hidden">
             <div class="menu-logo-container">
                 <img src="./logo.svg" class="game-logo-img" alt="Climb-or-Fall Rage Platformer Game Logo">
                 <h1 class="logo-text">CLIMB<br><span>OR FALL</span></h1>
+                <div style="font-size: 1rem; color: #aaa; margin-top: 15px; font-weight: bold; letter-spacing: 1px;">
+                    <span style="color: #777;">PLAYER:</span> <span id="menu-player-name"
+                        style="color: #00ffcc;">Loading...</span>
+                </div>
             </div>
-            <h1 class="horror-title" style="font-size: 3rem; margin-top: 20px;">CHOOSE FATE</h1>
+
+            <!-- Global Leaderboard Display -->
+            <div id="global-leaderboard" class="leaderboard-card">
+                <div class="leaderboard-badge">🏆 #1 GLOBAL</div>
+                <div id="top-player-name" class="leaderboard-name">...</div>
+                <div class="leaderboard-score-container">
+                    <span class="score-label">BEST CLIMB:</span>
+                    <span id="top-player-score" class="score-value">--</span><span class="score-unit">m</span>
+                </div>
+            </div>
+
+            <h1 class="horror-title" style="font-size: 3rem; margin-top: 10px;">CHOOSE FATE</h1>
             <div class="menu-buttons">
                 <button class="menu-btn easy" data-difficulty="easy">
                     EASY
@@ -138,6 +140,46 @@
                     HARD
                     <span class="btn-desc">Pure agony</span>
                 </button>
+            </div>
+            <button id="btn-how-to-play" class="menu-btn" style="margin-top: 20px; background: #333;">
+                HOW TO PLAY
+            </button>
+
+            <!-- Legal Links -->
+            <div style="margin-top: 30px; display: flex; gap: 15px; font-size: 0.8rem;">
+                <a href="#" id="link-terms" style="color: #aaa; text-decoration: underline;">Terms & Conditions</a>
+                <a href="#" id="link-privacy" style="color: #aaa; text-decoration: underline;">Privacy Policy</a>
+            </div>
+        </div>
+
+        <!-- How to Play Screen -->
+        <div id="how-to-play-screen" class="screen-overlay hidden">
+            <button class="close-btn">×</button>
+            <h1 class="horror-title" style="font-size: 2.5rem;">HOW TO PLAY</h1>
+            <div
+                style="background: rgba(0,0,0,0.8); padding: 20px; border-radius: 10px; border: 2px solid #555; max-width: 400px; text-align: left; color: #ddd; font-family: 'Outfit', sans-serif;">
+                <p style="margin-bottom: 15px;"><strong>OBJECTIVE:</strong> Climb as high as you can. Avoid the rising
+                    lava!</p>
+                <p style="margin-bottom: 15px;"><strong>DESKTOP CONTROLS:</strong><br />
+                    <kbd>←</kbd> <kbd>→</kbd> or <kbd>A</kbd> <kbd>D</kbd> to Move<br />
+                    <kbd>↑</kbd> or <kbd>SPACE</kbd> to Jump/Wall-Jump<br />
+                    <kbd>SHIFT</kbd> to Dash
+                </p>
+                <p style="margin-bottom: 15px;"><strong>MOBILE CONTROLS:</strong><br />
+                    Use the on-screen arrows to move and jump.</p>
+                <p style="color: #ffcc00;">Collect coins to unlock exclusive skins!</p>
+            </div>
+            <button id="btn-start-from-tutorial" class="menu-btn" style="margin-top: 20px; background: #555;">GOT
+                IT</button>
+        </div>
+
+        <!-- Terms and Privacy Overlays -->
+        <div id="legal-screen" class="screen-overlay hidden">
+            <button class="close-btn">×</button>
+            <h1 class="horror-title" id="legal-title" style="font-size: 2.5rem;">LEGAL</h1>
+            <div id="legal-content"
+                style="background: rgba(0,0,0,0.8); padding: 20px; border-radius: 10px; border: 2px solid #555; max-width: 600px; max-height: 50vh; overflow-y: auto; text-align: left; color: #ddd; font-family: 'Outfit', sans-serif; font-size: 0.9rem; line-height: 1.5;">
+                <!-- Content injected via JS -->
             </div>
         </div>
 
@@ -239,9 +281,15 @@
             </div>
         </div>
 
-        <div id="level-up-toast" class="hidden">
-            <h2 class="toast-title">LEVEL UP!</h2>
-            <p class="toast-desc">Unlocked a new reward</p>
+        <!-- Level Up / Level Complete Animation -->
+        <div id="level-up-overlay" class="screen-overlay hidden"
+            style="background: rgba(0,0,0,0.85); justify-content: center; align-items: center;">
+            <div class="level-up-content" style="text-align: center;">
+                <h1 class="horror-title" style="font-size: 4rem; color: #ffcc00; text-shadow: 0 0 20px #ffaa00;">LEVEL
+                    COMPLETE</h1>
+                <p class="toast-desc" style="font-size: 1.5rem; color: #fff; margin-top: 10px;">Theme Rank Increased</p>
+                <div style="font-size: 3rem; margin-top: 20px;">⭐</div>
+            </div>
         </div>
 
         <canvas id="game-canvas"></canvas>

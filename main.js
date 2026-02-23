@@ -5,9 +5,9 @@ const CONFIG = {
     canvasWidth: window.innerWidth,
     canvasHeight: window.innerHeight,
     playerRadius: 18,
-    jumpForce: -34,
-    moveSpeed: 24,
-    maxHorizontalVelocity: 32,
+    jumpForce: -32,
+    moveSpeed: 14,
+    maxHorizontalVelocity: 20,
     platformWidth: 140,
     platformHeight: 25,
 };
@@ -24,22 +24,25 @@ const SKINS = [
     { id: 'toxic', name: 'Toxic', color: '#00ff44', price: 100 },
     { id: 'frost', name: 'Frost', color: '#00ccff', price: 200 },
     { id: 'gold', name: 'Gilded', color: '#ffcc00', price: 500 },
+    { id: 'phantom', name: 'Phantom', color: '#ffffff', price: 750 },
+    { id: 'cyber', name: 'Cyberpunk', color: '#00ffff', price: 1200 },
+    { id: 'inferno', name: 'Inferno', color: '#ff4500', price: 2000 },
     { id: 'xmas', name: 'Xmas', color: '#ff0000', price: 9999 }
 ];
 
 const THEMES = {
-    cave: { platform: '#2d3436', stroke: '#636e72', lava: '#ff4d00', glow: '#ff6600', bg: 'radial-gradient(circle at 50% 120%, rgba(255, 77, 0, 0.15), transparent 70%)', hazard: '#444' },
+    cave: { platform: '#2d3436', stroke: '#636e72', lava: '#ff3300', glow: '#ff0000', bg: 'radial-gradient(circle at 50% 120%, rgba(255, 77, 0, 0.15), transparent 70%)', hazard: '#444' },
     lava: { platform: '#2d1a1a', stroke: '#ff3e3e', lava: '#ff3300', glow: '#ff0000', bg: 'radial-gradient(circle at 50% 120%, rgba(255, 30, 0, 0.3), transparent 70%)', hazard: '#ff0000' },
-    frost: { platform: '#1a2a2e', stroke: '#00d1ff', lava: '#00a3ff', glow: '#00ccff', bg: 'radial-gradient(circle at 50% 120%, rgba(0, 209, 255, 0.15), transparent 70%)', hazard: '#ff0000' },
-    void: { platform: '#0a0a0f', stroke: '#9d00ff', lava: '#4d00ff', glow: '#9d00ff', bg: 'radial-gradient(circle at 50% 120%, rgba(157, 0, 255, 0.15), transparent 70%)', hazard: '#ff0000' },
-    gold: { platform: '#26241e', stroke: '#ffcc00', lava: '#ffaa00', glow: '#ffcc00', bg: 'radial-gradient(circle at 50% 120%, rgba(255, 204, 0, 0.15), transparent 70%)', hazard: '#ff0000' }
+    frost: { platform: '#1a2a2e', stroke: '#00d1ff', lava: '#ff3300', glow: '#ff0000', bg: 'radial-gradient(circle at 50% 120%, rgba(0, 209, 255, 0.15), transparent 70%)', hazard: '#ff0000' },
+    void: { platform: '#0a0a0f', stroke: '#9d00ff', lava: '#ff3300', glow: '#ff0000', bg: 'radial-gradient(circle at 50% 120%, rgba(157, 0, 255, 0.15), transparent 70%)', hazard: '#ff0000' },
+    gold: { platform: '#26241e', stroke: '#ffcc00', lava: '#ff3300', glow: '#ff0000', bg: 'radial-gradient(circle at 50% 120%, rgba(255, 204, 0, 0.15), transparent 70%)', hazard: '#ff0000' }
 };
 
 // MANUAL HEARTBEAT FLAG
 let LOOP_ACTIVE = false;
 
-import { auth, googleProvider, db } from './firebase-config.js';
-import { signInWithPopup, signInAnonymously, onAuthStateChanged, signOut } from "firebase/auth";
+import { auth, db, collection, query, orderBy, limit, getDocs } from './firebase-config.js';
+import { signInAnonymously, onAuthStateChanged } from "firebase/auth";
 import { doc, setDoc, getDoc } from "firebase/firestore";
 
 class AudioManager {
@@ -155,6 +158,7 @@ class Game {
         this.maxHeight = 0;
         this.currentHeight = 0;
         this.bestHeight = parseInt(localStorage.getItem('bestHeight')) || 0;
+        this.playerName = localStorage.getItem('playerName') || this.generatePlayerName();
 
         // Progression
         this.coins = parseInt(localStorage.getItem('coins')) || 0;
@@ -178,7 +182,18 @@ class Game {
         this.init();
     }
 
-    init() {
+    generatePlayerName() {
+        const adjectives = ["Crazy", "Savage", "Phantom", "Toxic", "Silent", "Neon", "Cosmic", "Rage", "Shadow", "Crimson"];
+        const nouns = ["Climber", "Jumper", "Ninja", "Ghost", "Void", "Titan", "Runner", "Beast", "Rebel", "Soul"];
+        const adj = adjectives[Math.floor(Math.random() * adjectives.length)];
+        const noun = nouns[Math.floor(Math.random() * nouns.length)];
+        const num = Math.floor(Math.random() * 9999);
+        const name = `${adj}${noun}${num}`;
+        localStorage.setItem('playerName', name);
+        return name;
+    }
+
+    async init() {
         this.updateHUD();
         this.setupEventListeners();
         this.renderSkins();
@@ -188,6 +203,20 @@ class Game {
 
         // Start Rendering
         Render.run(this.render);
+
+        try {
+            // First, initialize CrazyGames SDK asynchronously
+            if (window.CrazyGames && window.CrazyGames.SDK) {
+                // don't block everything forever if running locally without sandbox
+                await Promise.race([
+                    window.CrazyGames.SDK.game.init(),
+                    new Promise(resolve => setTimeout(resolve, 2000))
+                ]);
+                console.log("CrazyGames SDK initialized successfully");
+            }
+        } catch (e) {
+            console.warn("CrazyGames SDK failed to initialize or isn't present:", e);
+        }
 
         // Start MANUAL loop
         if (!LOOP_ACTIVE) {
@@ -200,18 +229,21 @@ class Game {
 
         Events.on(this.render, 'afterRender', () => this.postProcess());
 
-        // DIRECT PLAY BYPASS: If no user, treat as local guest automatically
         onAuthStateChanged(auth, (user) => {
             if (user) {
                 this.user = user;
-                console.log("User Authenticated:", user.uid);
+                this.isLocalGuest = false;
+                console.log("User Authenticated (Anonymous UID):", user.uid);
+                this.fetchGlobalTopPlayer();
                 this.showMenu();
             } else {
-                // Auto-fallback to local guest for instant play
-                console.log("No User Found: Auto-entering Guest Mode");
-                this.isLocalGuest = true;
-                this.user = { uid: 'guest-' + Date.now() };
-                this.showMenu();
+                console.log("No User Found: Auto-Authenticating as Anonymous Firebase User...");
+                signInAnonymously(auth).catch(error => {
+                    console.warn("Firebase Auth Failed. Falling back to Local Only:", error);
+                    this.isLocalGuest = true;
+                    this.user = { uid: 'guest-' + Date.now() };
+                    this.showMenu();
+                });
             }
         });
     }
@@ -258,6 +290,11 @@ class Game {
         // Navigation
         document.getElementById('btn-shop').onclick = () => document.getElementById('shop-screen').classList.remove('hidden');
         document.getElementById('btn-pass').onclick = () => document.getElementById('pass-screen').classList.remove('hidden');
+
+        // Onboarding Display
+        document.getElementById('btn-how-to-play').onclick = () => document.getElementById('how-to-play-screen').classList.remove('hidden');
+        document.getElementById('btn-start-from-tutorial').onclick = () => document.getElementById('how-to-play-screen').classList.add('hidden');
+
         document.querySelectorAll('.close-btn').forEach(btn => {
             btn.onclick = () => btn.parentElement.classList.add('hidden');
         });
@@ -357,40 +394,73 @@ class Game {
         addTouch('btn-right', 'RIGHT');
         addTouch('btn-jump', 'JUMP');
 
-        // --- Auth Listeners ---
-        document.getElementById('btn-google-login').onclick = () => this.handleGoogleLogin();
-        document.getElementById('btn-guest-login').onclick = () => this.handleGuestLogin();
+        // --- Legal Listeners ---
+        document.getElementById('link-terms').onclick = (e) => { e.preventDefault(); this.showLegal('terms'); };
+        document.getElementById('link-privacy').onclick = (e) => { e.preventDefault(); this.showLegal('privacy'); };
+        document.querySelector('#legal-screen .close-btn').onclick = () => document.getElementById('legal-screen').classList.add('hidden');
     }
 
-    handleGoogleLogin() {
-        // Rebranded as Play Games for Web
-        signInWithPopup(auth, googleProvider)
-            .then((result) => {
-                console.log("Logged in with Google Play:", result.user.displayName);
-                this.showMenu();
-            }).catch((error) => {
-                console.error("Login Failed:", error);
-                alert("Google Play Login Failed: " + error.message);
-            });
+    async fetchGlobalTopPlayer() {
+        try {
+            const scoresRef = collection(db, "scores");
+            const q = query(scoresRef, orderBy("score", "desc"), limit(1));
+            const querySnapshot = await getDocs(q);
+
+            if (!querySnapshot.empty) {
+                const topPlayer = querySnapshot.docs[0].data();
+                document.getElementById('top-player-name').innerText = topPlayer.displayName || "GUEST CLIMBER";
+                document.getElementById('top-player-score').innerText = topPlayer.score;
+            } else {
+                document.getElementById('top-player-name').innerText = "BE THE FIRST";
+                document.getElementById('top-player-score').innerText = "0";
+            }
+        } catch (error) {
+            console.error("Failed to fetch global top player:", error);
+            document.getElementById('top-player-name').innerText = "OFFLINE";
+        }
     }
 
-    handleGuestLogin() {
-        signInAnonymously(auth)
-            .then(() => {
-                console.log("Logged in as Firebase Guest");
-                this.isLocalGuest = false;
-                this.showMenu();
-            }).catch((error) => {
-                console.warn("Firebase Guest Access Failed, falling back to Local Guest:", error.message);
-                this.isLocalGuest = true;
-                this.user = { uid: 'local-guest-' + Date.now() }; // Temporary ID for session
-                this.showMenu();
-            });
+    showLegal(type) {
+        const title = document.getElementById('legal-title');
+        const content = document.getElementById('legal-content');
+
+        if (type === 'terms') {
+            title.innerText = "TERMS OF SERVICE";
+            content.innerHTML = `
+                <h2>1. Acceptance of Terms</h2>
+                <p>By accessing and playing Climb-or-Fall, you agree to be bound by these Terms of Service. If you do not agree to these terms, please do not use the service.</p>
+                <h2>2. User Accounts</h2>
+                <p>The game automatically generates an anonymous guest account tied to your browser leveraging Firebase Authentication. Do not attempt to reverse engineer or tamper with leaderboard scores. We reserve the right to delete tampered accounts.</p>
+                <h2>3. Intellectual Property</h2>
+                <p>All assets, logos, and game code are the property of the developer (Ravi Dandaiya). Do not redistribute or claim as your own.</p>
+                <h2>4. Third-Party Services</h2>
+                <p>The game utilizes the CrazyGames SDK for analytics and advertisements. Your interaction with these ads is governed by their respective policies.</p>
+            `;
+        } else {
+            title.innerText = "PRIVACY POLICY";
+            content.innerHTML = `
+                <h2>1. Data Collection</h2>
+                <p>We collect minimal data necessary to function. The game automatically provisions an anonymous identifier via Firebase Authentication to save your high scores, unlocked skins, and battle pass progression.</p>
+                <h2>2. Advertisements</h2>
+                <p>We use the CrazyGames SDK to display advertisements. CrazyGames and their partners may collect technical or non-personally identifiable information such as IP addresses or device IDs to serve relevant ads.</p>
+                <h2>3. Local Storage</h2>
+                <p>We store game volume, skin preferences, and temporary state data securely in your browser's Local Storage.</p>
+                <h2>4. Modifications to Policy</h2>
+                <p>We reserve the right to update this policy at any time. Continued use of the service signifies acceptance of the new policy.</p>
+            `;
+        }
+        document.getElementById('legal-screen').classList.remove('hidden');
     }
 
     showMenu() {
-        document.getElementById('login-screen').classList.add('hidden');
+        const loginScreen = document.getElementById('login-screen');
+        if (loginScreen) {
+            loginScreen.classList.add('hidden');
+        }
         document.getElementById('difficulty-screen').classList.remove('hidden');
+
+        const menuName = document.getElementById('menu-player-name');
+        if (menuName) menuName.innerText = this.playerName;
     }
 
     updateHUD(forced = false) {
@@ -404,6 +474,11 @@ class Game {
 
         const coinText = document.getElementById('coin-count');
         const heightText = document.getElementById('height-value');
+        const nameText = document.getElementById('hud-player-name');
+
+        if (nameText && nameText.innerText !== this.playerName) {
+            nameText.innerText = this.playerName;
+        }
 
         // Coin Update + Pulse
         if (coinText.innerText !== String(this.coins) || forced) {
@@ -436,6 +511,16 @@ class Game {
             location.reload();
             return;
         }
+
+        // CrazyGames gameplay Start tracking
+        try {
+            if (window.CrazyGames && window.CrazyGames.SDK) {
+                window.CrazyGames.SDK.game.gameplayStart();
+            }
+        } catch (e) {
+            console.warn("CrazyGames gameplayStart failed:", e);
+        }
+
         this.difficulty = diff;
         const settings = DIFFICULTY_SETTINGS[diff];
         this.lavaSpeed = settings.lavaSpeed;
@@ -539,10 +624,17 @@ class Game {
         if (isPillar) {
             const height = 180 + Math.random() * 120;
             const x = Math.random() * (CONFIG.canvasWidth - 100) + 50;
+            const isHazardPillar = (this.passLevel > 2) && (Math.random() < settings.hazardChance);
+            const theme = this.getCurrentTheme();
+
             const pillar = Bodies.rectangle(x, y - height / 2, 40, height, {
                 isStatic: true,
-                label: 'platform',
-                render: { fillStyle: '#2d3436', strokeStyle: '#9d00ff', lineWidth: 3 }
+                label: isHazardPillar ? 'hazard' : 'platform',
+                render: {
+                    fillStyle: isHazardPillar ? theme.hazard : '#2d3436',
+                    strokeStyle: isHazardPillar ? '#f00' : '#9d00ff',
+                    lineWidth: 3
+                }
             });
             this.platforms.push(pillar);
             World.add(this.world, pillar);
@@ -615,6 +707,9 @@ class Game {
                 const coin = collision.bodyA.label === 'coin' ? collision.bodyA : collision.bodyB;
                 this.collectCoin(coin);
             }
+            if (!this.isGameOver && (collision.bodyA.label === 'hazard' || collision.bodyB.label === 'hazard')) {
+                this.triggerDeath("IMPALED ON HAZARD");
+            }
         });
     }
 
@@ -667,8 +762,8 @@ class Game {
         // Ground Check
         const onGround = this.checkGrounded();
 
-        // Horizontal Movement (Snappy Acceleration + Friction)
-        const accel = onGround ? 1.2 : 0.8;
+        // Horizontal Movement (Snappy Acceleration + Friction) - Lowered sensitivity
+        const accel = onGround ? 0.6 : 0.4;
         const friction = onGround ? 0.82 : 0.92;
 
         let targetVx = 0;
@@ -756,6 +851,16 @@ class Game {
         if (this.isGameOver) return;
         this.audio.playDeath();
         this.isGameOver = true;
+
+        // CrazyGames gameplay Stop tracking
+        try {
+            if (window.CrazyGames && window.CrazyGames.SDK) {
+                window.CrazyGames.SDK.game.gameplayStop();
+            }
+        } catch (e) {
+            console.warn("CrazyGames gameplayStop failed:", e);
+        }
+
         this.shake = 35;
         document.getElementById('fall-distance').innerText = this.maxHeight;
         document.getElementById('death-screen').classList.remove('hidden');
@@ -774,12 +879,67 @@ class Game {
         if (this.user) {
             this.saveScore(this.maxHeight);
         }
+
+        // Show midgame ad on death
+        try {
+            if (window.CrazyGames && window.CrazyGames.SDK) {
+                window.CrazyGames.SDK.ad.requestAd("midgame", {
+                    adStarted: () => { console.log("Midgame Ad Started"); this.audio.enabled = false; },
+                    adFinished: () => { console.log("Midgame Ad Finished"); this.audio.enabled = true; },
+                    adError: () => { console.log("Midgame Ad Error"); this.audio.enabled = true; }
+                });
+            }
+        } catch (e) {
+            console.warn("CrazyGames midgame ad failed:", e);
+        }
     }
 
     startAdRevive() {
         console.log("Attempting Instant Revive...");
+
         try {
-            // Instant Revive - No Ad, No Timer
+            if (window.CrazyGames && window.CrazyGames.SDK) {
+                // Request rewarded ad
+                window.CrazyGames.SDK.ad.requestAd("rewarded", {
+                    adStarted: () => {
+                        console.log("Ad started");
+                        // mute audio
+                        this.audio.enabled = false;
+                    },
+                    adFinished: () => {
+                        console.log("Ad finished, rewarding player");
+                        this.audio.enabled = true;
+                        this.executeRevive();
+                    },
+                    adError: (error) => {
+                        console.log("Ad error", error);
+                        // still forgive player if ad failed
+                        this.audio.enabled = true;
+                        this.executeRevive();
+                    }
+                });
+                return; // Wait for callback
+            }
+        } catch (e) {
+            console.warn("CrazyGames rewarded ad failed:", e);
+        }
+
+        // Fallback for local
+        this.executeRevive();
+    }
+
+    executeRevive() {
+        try {
+            // Ensure CrazyGames gameplay start is called again since we stopped it on death
+            try {
+                if (window.CrazyGames && window.CrazyGames.SDK) {
+                    window.CrazyGames.SDK.game.gameplayStart();
+                }
+            } catch (e) {
+                console.warn("CrazyGames revive gameplayStart failed", e);
+            }
+
+            // Instant Revive execution
             document.getElementById('death-screen').classList.add('hidden');
             document.getElementById('ad-prompt').classList.add('hidden');
             this.revive();
@@ -1086,7 +1246,7 @@ class Game {
                 if (score > data.score) {
                     setDoc(userRef, {
                         uid: this.user.uid,
-                        displayName: this.user.displayName || "Guest",
+                        displayName: this.playerName,
                         score: score,
                         timestamp: new Date()
                     }, { merge: true });
@@ -1094,7 +1254,7 @@ class Game {
             } else {
                 setDoc(userRef, {
                     uid: this.user.uid,
-                    displayName: this.user.displayName || "Guest",
+                    displayName: this.playerName,
                     score: score,
                     timestamp: new Date()
                 });
@@ -1132,9 +1292,16 @@ class Game {
 
     showLevelUp() {
         this.audio.playLevelUp();
-        const toast = document.getElementById('level-up-toast');
-        toast.classList.remove('hidden');
-        setTimeout(() => toast.classList.add('hidden'), 3000);
+        const overlay = document.getElementById('level-up-overlay');
+        overlay.classList.remove('hidden');
+
+        // Add a quick pulse animation to the content
+        const content = overlay.querySelector('.level-up-content');
+        content.classList.remove('pulse-animation');
+        void content.offsetWidth; // trigger reflow
+        content.classList.add('pulse-animation');
+
+        setTimeout(() => overlay.classList.add('hidden'), 2500); // Hide after 2.5 seconds
     }
 }
 

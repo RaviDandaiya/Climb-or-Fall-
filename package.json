@@ -12,7 +12,10 @@
     "vite": "^5.0.0"
   },
   "dependencies": {
+    "archiver": "^7.0.1",
     "firebase": "^12.9.0",
-    "matter-js": "^0.19.0"
+    "matter-js": "^0.19.0",
+    "puppeteer": "^24.37.5",
+    "vite-plugin-singlefile": "^2.3.0"
   }
 }

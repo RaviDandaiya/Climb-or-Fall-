@@ -37,6 +37,13 @@
     }
 
     /* Start Screen Adjustments */
+    .screen-overlay {
+        justify-content: flex-start;
+        padding-top: 60px;
+        padding-bottom: 30px;
+        overflow-y: auto;
+    }
+
     .menu-logo-container {
         margin-bottom: 20px;
     }
